@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title th:text="'Заказ #' + ${order.id}">Заказ</title></head>
+<body>
+<h1>Заказ #<span th:text="${order.id}">0</span></h1>
+<div th:if="${newOrder}" style="color:green;">Заказ успешно оформлен!</div>
+<table border="1">
+    <tr><th>Товар</th><th>Цена</th><th>Кол-во</th></tr>
+    <tr th:each="item : ${order.items}">
+        <td th:text="${item.title}">Название</td>
+        <td th:text="${item.price}">0 ₽</td>
+        <td th:text="${item.count}">0</td>
+    </tr>
+</table>
+<h2>Итого: <span th:text="${#numbers.formatInteger(order.totalSum, 'COMMA')}">0</span> ₽</h2>
+<p><a th:href="@{/orders}">← К заказам</a> | <a th:href="@{/items}">Товары</a></p>
+</body>
+</html>
