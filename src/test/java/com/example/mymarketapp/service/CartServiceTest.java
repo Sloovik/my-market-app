@@ -1,175 +1,167 @@
 package com.example.mymarketapp.service;
 
 import com.example.mymarketapp.dto.ActionDto;
-import com.example.mymarketapp.entity.Item;
-import com.example.mymarketapp.model.CartItem;
-import jakarta.servlet.http.HttpSession;
+import com.example.mymarketapp.entity.*;
+import com.example.mymarketapp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CartServiceTest {
 
-    @Mock private ItemService itemService;
-    @Mock private HttpSession session;
+    @Mock private CartRepository cartRepository;
+    @Mock private CartItemRepository cartItemRepository;
+    @Mock private ItemRepository itemRepository;
+    @Mock private UserRepository userRepository;
+
     @InjectMocks private CartService cartService;
 
+    private User testUser;
+    private Cart testCart;
     private Item testItem;
+    private CartItem testCartItem;
 
     @BeforeEach
     void setUp() {
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setUsername("testuser");
+
+        testCart = new Cart();
+        testCart.setId(1L);
+        testCart.setUser(testUser);
+
         testItem = new Item();
         testItem.setId(1L);
         testItem.setTitle("Test Item");
         testItem.setPrice(1000L);
+
+        testCartItem = new CartItem();
+        testCartItem.setId(1L);
+        testCartItem.setItemId(1L);
+        testCartItem.setCount(2);
+        testCartItem.setPrice(1000L);
     }
 
     @Test
-    void getCartNullSessionReturnsEmpty() {
-        List<CartItem> result = cartService.getCart(null);
-        assertThat(result).isEmpty();
-    }
+    void getCartReturnsItems() {
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
 
-    @Test
-    void getCartNoAttributeReturnsNewCart() {
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(null);
-
-        List<CartItem> result = cartService.getCart(session);
-
-        assertThat(result).isEmpty();
-        verify(session).setAttribute(CartService.CART_SESSION_KEY, result);
-    }
-
-    @Test
-    void getCartExistingReturnsCopy() {
-        CartItem existingItem = new CartItem();
-        existingItem.setId(1L);
-        List<CartItem> cart = List.of(existingItem);
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
-
-        List<CartItem> result = cartService.getCart(session);
+        List<CartItem> result = cartService.getCart(1L);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(1L);
-        verify(session, never()).setAttribute(anyString(), any());
+        assertThat(result.get(0).getCount()).isEqualTo(2);
+        verify(userRepository).existsById(eq(1L));
+        verify(userRepository).findById(eq(1L));
     }
 
     @Test
-    void getTotalEmptyCartReturnsZero() {
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(new ArrayList<>());
+    void getCartUserNotFoundThrowsException() {
+        when(userRepository.existsById(eq(1L))).thenReturn(false);
 
-        long total = cartService.getTotal(session);
-
-        assertThat(total).isZero();
+        assertThatThrownBy(() -> cartService.getCart(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("User not found: 1");
     }
 
     @Test
-    void getTotalWithItemsReturnsSum() {
-        CartItem item1 = new CartItem(); item1.setPrice(1000L); item1.setCount(2);
-        CartItem item2 = new CartItem(); item2.setPrice(500L); item2.setCount(3);
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(List.of(item1, item2));
+    void getTotalReturnsCorrectSum() {
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
 
-        long total = cartService.getTotal(session);
+        long total = cartService.getTotal(1L);
 
-        assertThat(total).isEqualTo(3500L);
+        assertThat(total).isEqualTo(2000L);
     }
 
     @Test
-    void getCountNotFoundReturnsZero() {
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(new ArrayList<>());
+    void getCountReturnsCorrectCount() {
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
 
-        int count = cartService.getCount(999L, session);
+        int count = cartService.getCount(1L, 1L);
 
-        assertThat(count).isZero();
-    }
-
-    @Test
-    void getCountFoundReturnsCount() {
-        CartItem item = new CartItem(); item.setId(1L); item.setCount(3);
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(List.of(item));
-
-        int count = cartService.getCount(1L, session);
-
-        assertThat(count).isEqualTo(3);
+        assertThat(count).isEqualTo(2);
     }
 
     @Test
     void updateCartDeleteRemovesItem() {
-        CartItem item = new CartItem(); item.setId(1L);
-        List<CartItem> cart = new ArrayList<>(List.of(item));
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
 
-        cartService.updateCart(1L, ActionDto.DELETE, itemService, session);
+        cartService.updateCart(1L, 1L, ActionDto.DELETE);
 
-        assertThat(cartService.getCart(session)).isEmpty();
+        verify(cartItemRepository).delete(testCartItem);
     }
-
 
     @Test
     void updateCartPlusIncreasesCount() {
-        CartItem item = new CartItem(); item.setId(1L); item.setCount(1);
-        List<CartItem> cart = new ArrayList<>(List.of(item));
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
 
-        cartService.updateCart(1L, ActionDto.PLUS, itemService, session);
+        cartService.updateCart(1L, 1L, ActionDto.PLUS);
 
-        assertThat(item.getCount()).isEqualTo(2);
-        verify(session).setAttribute(CartService.CART_SESSION_KEY, cart);
+        assertThat(testCartItem.getCount()).isEqualTo(3);
+        verify(cartItemRepository).save(testCartItem);
     }
 
     @Test
-    void updateCartMinusToZeroRemovesItem() {
-        CartItem item = new CartItem(); item.setId(1L); item.setCount(1);
-        List<CartItem> cart = new ArrayList<>(List.of(item));
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
+    void updateCartMinusToZeroDeletesItem() {
+        testCartItem.setCount(1);
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
 
-        cartService.updateCart(1L, ActionDto.MINUS, itemService, session);
+        cartService.updateCart(1L, 1L, ActionDto.MINUS);
 
-        assertThat(cart).isEmpty();
-        verify(session).setAttribute(CartService.CART_SESSION_KEY, cart);
+        verify(cartItemRepository).delete(testCartItem);
     }
 
     @Test
-    void updateCartPlusNewItemCreatesFromItemService() {
-        List<CartItem> cart = new ArrayList<>();
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
-        when(itemService.getItem(1L)).thenReturn(testItem);
+    void updateCartPlusNewItemCreatesNew() {
+        when(userRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
+        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
+        when(itemRepository.findById(eq(1L))).thenReturn(Optional.of(testItem));
+        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.empty());
 
-        cartService.updateCart(1L, ActionDto.PLUS, itemService, session);
+        cartService.updateCart(1L, 1L, ActionDto.PLUS);
 
-        assertThat(cart).hasSize(1);
-        CartItem newItem = cart.get(0);
-        assertThat(newItem.getId()).isEqualTo(1L);
-        assertThat(newItem.getTitle()).isEqualTo("Test Item");
-        assertThat(newItem.getCount()).isOne();
-        verify(session).setAttribute(CartService.CART_SESSION_KEY, cart);
+        verify(cartItemRepository).save(argThat(item ->
+                item.getItemId().equals(1L) && item.getCount() == 1));
     }
 
     @Test
-    void updateCartMinusExistingDecreases() {
-        CartItem item = new CartItem(); item.setId(1L); item.setCount(3);
-        List<CartItem> cart = new ArrayList<>(List.of(item));
-        when(session.getAttribute(CartService.CART_SESSION_KEY)).thenReturn(cart);
-
-        cartService.updateCart(1L, ActionDto.MINUS, itemService, session);
-
-        assertThat(item.getCount()).isEqualTo(2);
-        verify(session).setAttribute(CartService.CART_SESSION_KEY, cart);
-    }
-
-    @Test
-    void clearCartRemovesAttribute() {
-        cartService.clearCart(session);
-        verify(session).removeAttribute(CartService.CART_SESSION_KEY);
+    void invalidUserIdThrowsException() {
+        assertThatThrownBy(() -> cartService.getCart(0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Valid userId required");
     }
 }

@@ -7,25 +7,28 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "order_items")
+@Table(name = "cart_items")
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString
-public class OrderItem {
+public class CartItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
+    @JoinColumn(name = "cart_id", nullable = false)
     @ToString.Exclude
-    private Order order;
+    private Cart cart;
 
-    @Column(name = "item_id")
-    private long itemId;
+    @Column(name = "item_id", nullable = false)
+    private Long itemId;
+
     private String title;
+    private String description;
+    private String imgPath;
     private long price;
     private int count;
 }

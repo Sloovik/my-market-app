@@ -1,84 +1,121 @@
 package com.example.mymarketapp.service;
 
 import com.example.mymarketapp.dto.ActionDto;
+import com.example.mymarketapp.entity.Cart;
+import com.example.mymarketapp.entity.CartItem;
 import com.example.mymarketapp.entity.Item;
-import com.example.mymarketapp.model.CartItem;
-import jakarta.servlet.http.HttpSession;
+import com.example.mymarketapp.entity.User;
+import com.example.mymarketapp.repository.CartItemRepository;
+import com.example.mymarketapp.repository.CartRepository;
+import com.example.mymarketapp.repository.ItemRepository;
+import com.example.mymarketapp.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@Transactional
+@RequiredArgsConstructor
 public class CartService {
-    public static final String CART_SESSION_KEY = "cart";
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
 
-    @SuppressWarnings("unchecked")
-    public List<CartItem> getCart(HttpSession session) {
-        if (session == null) return new ArrayList<>();
-
-        List<CartItem> cart = (List<CartItem>) session.getAttribute(CART_SESSION_KEY);
-        if (cart == null) {
-            cart = new ArrayList<>();
-            session.setAttribute(CART_SESSION_KEY, cart);
-        }
-        return cart;
+    public List<CartItem> getCart(Long userId) {
+        validateUser(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> createCartForUser(user));
+        return cartItemRepository.findByCartId(cart.getId());
     }
 
-    public List<CartItem> getCartItems(HttpSession session) {
-        return new ArrayList<>(getCart(session));
+    public long getTotal(Long userId) {
+        validateUserId(userId);
+        return getCart(userId).stream()
+                .mapToLong(item -> item.getPrice() * item.getCount()).sum();
     }
 
-    public long getTotal(HttpSession session) {
-        return getCart(session).stream()
-                .mapToLong(item -> item.getPrice() * item.getCount())
-                .sum();
+    public int getCount(Long itemId, Long userId) {
+        validateUserId(userId);
+        return getCart(userId).stream()
+                .filter(item -> item.getItemId().equals(itemId))
+                .mapToInt(CartItem::getCount).sum();
     }
 
-    public int getCount(long id, HttpSession session) {
-        return getCart(session).stream()
-                .filter(item -> item.getId() == id)
-                .mapToInt(CartItem::getCount)
-                .sum();
-    }
+    public void updateCart(Long userId, Long itemId, ActionDto action) {
+        validateUserId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> createCartForUser(user));
 
-    public void updateCart(long id, ActionDto action, ItemService itemService, HttpSession session) {
-        if (session == null) return;
-
-        List<CartItem> cart = getCart(session);
         if (action == ActionDto.DELETE) {
-            cart.removeIf(item -> item.getId() == id);
+            cartItemRepository.findByCartIdAndItemId(cart.getId(), itemId)
+                    .ifPresent(cartItemRepository::delete);
             return;
         }
 
-        Optional<CartItem> existing = cart.stream().filter(item -> item.getId() == id).findFirst();
+        Optional<CartItem> existing = cartItemRepository.findByCartIdAndItemId(cart.getId(), itemId);
 
         if (existing.isPresent()) {
             CartItem cartItem = existing.get();
             switch (action) {
                 case PLUS -> cartItem.setCount(cartItem.getCount() + 1);
                 case MINUS -> {
-                    if (cartItem.getCount() > 1) cartItem.setCount(cartItem.getCount() - 1);
-                    else cart.remove(cartItem);
+                    if (cartItem.getCount() > 1) {
+                        cartItem.setCount(cartItem.getCount() - 1);
+                    } else {
+                        cartItemRepository.delete(cartItem);
+                    }
                 }
             }
+            cartItemRepository.save(cartItem);
         } else if (action == ActionDto.PLUS) {
-            Item item = itemService.getItem(id);
+            Item item = itemRepository.findById(itemId)
+                    .orElseThrow(() -> new IllegalArgumentException("Item not found: " + itemId));
             CartItem newItem = new CartItem();
-            newItem.setId(item.getId());
+            newItem.setCart(cart);
+            newItem.setItemId(item.getId());
             newItem.setTitle(item.getTitle());
             newItem.setDescription(item.getDescription());
             newItem.setImgPath(item.getImgPath());
             newItem.setPrice(item.getPrice());
             newItem.setCount(1);
-            cart.add(newItem);
+            cartItemRepository.save(newItem);
         }
-
-        session.setAttribute(CART_SESSION_KEY, cart);
     }
 
-    public void clearCart(HttpSession session) {
-        if (session != null) session.removeAttribute(CART_SESSION_KEY);
+    public void clearCart(Long userId) {
+        validateUserId(userId);
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Cart not found for user: " + userId));
+        cartItemRepository.deleteAll(cart.getItems());
+        cart.getItems().clear();
+        cartRepository.save(cart);
+    }
+
+    private void validateUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("Valid userId required");
+        }
+    }
+
+    private void validateUser(Long userId) {
+        validateUserId(userId);
+        if (!userRepository.existsById(userId)) {
+            throw new IllegalStateException("User not found: " + userId);
+        }
+    }
+
+    private Cart createCartForUser(User user) {
+        Cart cart = new Cart();
+        cart.setUser(user);
+        user.setCart(cart);
+        return cartRepository.save(cart);
     }
 }

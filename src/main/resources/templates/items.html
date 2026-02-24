@@ -24,8 +24,10 @@
         </form>
     </div>
 </div>
-<a th:href="@{/items(search=${search},sort=${sort},pageNumber=${paging.pageNumber - 1},pageSize=${paging.pageSize})}" th:if="${paging.hasPrevious}">Предыдущая</a>
-<a th:href="@{/items(search=${search},sort=${sort},pageNumber=${paging.pageNumber + 1},pageSize=${paging.pageSize})}" th:if="${paging.hasNext}">Следующая</a>
+<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber - 1},pageSize=${paging.pageSize})}"
+   th:if="${paging != null and paging.hasPrevious}">Предыдущая</a>
+<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber + 1},pageSize=${paging.pageSize})}"
+   th:if="${paging != null and paging.hasNext}">Следующая</a>
 <a th:href="@{/cart}">Корзина (<span th:text="${totalCart}">0</span>)</a>
 <a th:href="@{/orders}">Заказы</a>
 </body>
