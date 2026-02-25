@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Заказы</title></head>
+<body>
+<h1>Мои заказы</h1>
+<table border="1">
+    <tr><th>ID</th><th>Товары</th><th>Сумма</th></tr>
+    <tr th:each="order : ${orders}">
+        <td th:text="${order.id}">0</td>
+        <td th:text="${order.items.size()}">0 товаров</td>
+        <td th:text="${#numbers.formatDecimal(order.totalSum, 0, 'COMMA')}">0 ₽</td>
+        <td><a th:href="@{/orders/{id}(id=${order.id})}">Подробнее</a></td>
+    </tr>
+</table>
+<p><a th:href="@{/items}">← Товары</a> | <a th:href="@{/cart}">Корзина</a></p>
+</body>
+</html>

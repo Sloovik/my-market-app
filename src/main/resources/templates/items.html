@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Товары</title></head>
+<body>
+<form th:action="@{/items}" method="get">
+    <input type="text" th:name="search" th:value="${search}" placeholder="Поиск"/>
+    <select th:name="sort">
+        <option value="NO">Без сортировки</option>
+        <option th:value="ALPHA" th:selected="${sort == 'ALPHA'}">По названию</option>
+        <option th:value="PRICE" th:selected="${sort == 'PRICE'}">По цене</option>
+    </select>
+    <button>Применить</button>
+</form>
+<div th:each="row : ${items}">
+    <div th:each="item : ${row}" th:if="${item.id != -1}">
+        <img th:src="${item.imgPath}"/>
+        <h3 th:text="${item.title}"></h3>
+        <p th:text="${item.description}"></p>
+        <p>Цена: <span th:text="${item.price}"></span></p>
+        <span th:text="${item.count}"></span>
+        <form th:action="@{/items/{id}(id=${item.id})}" method="post" th:attr="id=${item.id}">
+            <button name="action" value="PLUS">+</button>
+            <button name="action" value="MINUS">-</button>
+        </form>
+    </div>
+</div>
+<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber - 1},pageSize=${paging.pageSize})}"
+   th:if="${paging != null and paging.hasPrevious}">Предыдущая</a>
+<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber + 1},pageSize=${paging.pageSize})}"
+   th:if="${paging != null and paging.hasNext}">Следующая</a>
+<a th:href="@{/cart}">Корзина (<span th:text="${totalCart}">0</span>)</a>
+<a th:href="@{/orders}">Заказы</a>
+</body>
+</html>
