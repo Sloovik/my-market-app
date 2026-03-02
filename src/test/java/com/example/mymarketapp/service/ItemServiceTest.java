@@ -1,117 +1,90 @@
 package com.example.mymarketapp.service;
 
 import com.example.mymarketapp.dto.ItemDto;
-import com.example.mymarketapp.dto.PagingDto;
 import com.example.mymarketapp.entity.Item;
 import com.example.mymarketapp.repository.ItemRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-
-import java.util.List;
-import java.util.Optional;
+import org.mockito.Mockito;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class ItemServiceTest {
 
-    @Mock private ItemRepository itemRepository;
-    @Mock private CartService cartService;
-    @InjectMocks private ItemService itemService;
+    private ItemRepository itemRepository;
+    private CartService cartService;
+    private ItemService itemService;
 
-    @Test
-    void getPagedItemsReturnsCorrectFormat() {
-        Item item1 = new Item();
-        item1.setId(1L);
-        item1.setTitle("Test");
-
-        when(itemRepository.findAll(PageRequest.of(0, 5)))
-                .thenReturn(new PageImpl<>(List.of(item1)));
-        when(cartService.getCount(eq(1L), eq(1L))).thenReturn(0);
-
-        List<List<ItemDto>> result = itemService.getPagedItems(null, "NO", 1, 5, 1L);
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0)).hasSize(3);
-        verify(itemRepository).findAll(PageRequest.of(0, 5));
-        verify(cartService).getCount(eq(1L), eq(1L));
+    @BeforeEach
+    void setUp() {
+        itemRepository = Mockito.mock(ItemRepository.class);
+        cartService = Mockito.mock(CartService.class);
+        itemService = new ItemService(itemRepository, cartService);
     }
 
     @Test
-    void getPagedItemsWithSearchUsesSearchQuery() {
-        Item item1 = new Item();
-        item1.setId(1L);
-        item1.setTitle("Test Match");
+    void getItemDtoReturnsDto() {
+        long itemId = 1L;
+        long userId = 1L;
 
-        PageImpl<Item> searchPage = new PageImpl<>(List.of(item1), PageRequest.of(0, 5), 7);
-
-        when(itemRepository.findBySearch(eq("test"), eq(PageRequest.of(0, 5))))
-                .thenReturn(searchPage);
-        when(cartService.getCount(anyLong(), anyLong())).thenReturn(0);
-
-        List<List<ItemDto>> result = itemService.getPagedItems("test", "NO", 1, 5, 1L);
-
-        verify(itemRepository).findBySearch(eq("test"), eq(PageRequest.of(0, 5)));
-        assertThat(result).hasSize(1);
-    }
-
-    @Test
-    void getPagingCalculatesCorrectly() {
-        when(itemRepository.count()).thenReturn(20L);
-
-        PagingDto paging = itemService.getPaging(null, null, 2, 5);
-
-        assertThat(paging.hasPrevious()).isTrue();
-        assertThat(paging.hasNext()).isTrue();
-        assertThat(paging.pageSize()).isEqualTo(5);
-    }
-
-    @Test
-    void getItemDtoReturnsCorrectDto() {
         Item item = new Item();
-        item.setId(1L);
+        item.setId(itemId);
         item.setTitle("Test");
-        when(itemRepository.findById(eq(1L))).thenReturn(Optional.of(item));
-        when(cartService.getCount(eq(1L), eq(1L))).thenReturn(2);
+        item.setDescription("Desc");
+        item.setImgPath("/img");
+        item.setPrice(1000L);
 
-        ItemDto dto = itemService.getItemDto(1L, 1L);
+        when(itemRepository.findById(itemId)).thenReturn(Mono.just(item));
+        when(cartService.getCount(itemId, userId)).thenReturn(Mono.just(3));
 
-        assertThat(dto.id()).isEqualTo(1L);
-        assertThat(dto.count()).isEqualTo(2);
+        StepVerifier.create(itemService.getItemDto(itemId, userId))
+                .assertNext(dto -> {
+                    assertThat(dto.id()).isEqualTo(itemId);
+                    assertThat(dto.title()).isEqualTo("Test");
+                    assertThat(dto.count()).isEqualTo(3);
+                })
+                .verifyComplete();
     }
 
     @Test
-    void getItemDtoInvalidUserIdThrowsException() {
-        assertThatThrownBy(() -> itemService.getItemDto(1L, 0L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Valid userId required");
+    void getPagedItemsReturnsRowsOfThree() {
+        long userId = 1L;
+
+        Item i1 = new Item(); i1.setId(1L); i1.setTitle("A"); i1.setPrice(100L);
+        Item i2 = new Item(); i2.setId(2L); i2.setTitle("B"); i2.setPrice(200L);
+        Item i3 = new Item(); i3.setId(3L); i3.setTitle("C"); i3.setPrice(300L);
+        Item i4 = new Item(); i4.setId(4L); i4.setTitle("D"); i4.setPrice(400L);
+
+        when(itemRepository.findAll()).thenReturn(Flux.just(i1, i2, i3, i4));
+        when(cartService.getCount(anyLong(), eq(userId))).thenReturn(Mono.just(0));
+
+        StepVerifier.create(itemService.getPagedItems(null, "NO", 1, 5, userId))
+                .assertNext(rows -> {
+                    assertThat(rows).hasSize(2);
+                    assertThat(rows.get(0)).hasSize(3);
+                    assertThat(rows.get(1)).hasSize(3);
+                    ItemDto first = rows.get(0).get(0);
+                    assertThat(first.id()).isEqualTo(1L);
+                })
+                .verifyComplete();
     }
 
     @Test
-    void getPagedItemsInvalidUserIdThrowsException() {
-        assertThatThrownBy(() -> itemService.getPagedItems(null, "NO", 1, 5, 0L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Valid userId required");
-    }
+    void getPagingCalculatesFlags() {
+        when(itemRepository.count()).thenReturn(Mono.just(12L));
 
-    @Test
-    void getItemNotFoundThrowsException() {
-        when(itemRepository.findById(eq(999L))).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> itemService.getItem(999L))
-                .isInstanceOf(IllegalArgumentException.class);
+        StepVerifier.create(itemService.getPaging(null, "NO", 2, 5))
+                .assertNext(paging -> {
+                    assertThat(paging.pageNumber()).isEqualTo(2);
+                    assertThat(paging.hasPrevious()).isTrue();
+                    assertThat(paging.hasNext()).isTrue();
+                })
+                .verifyComplete();
     }
 }

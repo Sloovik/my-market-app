@@ -3,54 +3,74 @@ package com.example.mymarketapp.service;
 import com.example.mymarketapp.entity.CartItem;
 import com.example.mymarketapp.entity.Order;
 import com.example.mymarketapp.entity.OrderItem;
+import com.example.mymarketapp.repository.OrderItemRepository;
 import com.example.mymarketapp.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class OrderService {
+
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
 
-    public Order createOrder(Long userId) {
+    public Mono<Order> createOrder(Long userId) {
         if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("Valid userId required");
+            return Mono.error(new IllegalArgumentException("Valid userId required"));
         }
 
-        List<CartItem> cartItems = cartService.getCart(userId);
-        if (cartItems.isEmpty()) {
-            throw new IllegalStateException("Cart is empty");
-        }
+        Flux<CartItem> cartItemsFlux = cartService.getCart(userId);
 
-        Order order = new Order();
-        long totalSum = cartService.getTotal(userId);
-        order.setTotalSum(totalSum);
+        return cartItemsFlux
+                .collectList()
+                .flatMap(cartItems -> {
+                    if (cartItems.isEmpty()) {
+                        return Mono.error(new IllegalStateException("Cart is empty"));
+                    }
 
-        for (CartItem cartItem : cartItems) {
-            OrderItem orderItem = new OrderItem();
-            orderItem.setItemId(cartItem.getItemId());
-            orderItem.setTitle(cartItem.getTitle());
-            orderItem.setPrice(cartItem.getPrice());
-            orderItem.setCount(cartItem.getCount());
-            order.addItem(orderItem);
-        }
-
-        Order savedOrder = orderRepository.save(order);
-        cartService.clearCart(userId);
-        return savedOrder;
+                    return cartService.getTotal(userId)
+                            .flatMap(totalSum -> {
+                                Order order = new Order();
+                                order.setUserId(userId);
+                                order.setTotalSum(totalSum);
+                                return orderRepository.save(order)
+                                        .flatMap(savedOrder -> saveOrderItems(savedOrder, cartItems)
+                                                .then(cartService.clearCart(userId))
+                                                .thenReturn(savedOrder));
+                            });
+                });
     }
 
-    public List<Order> getAllOrders() {
+    public Flux<Order> getAllOrders() {
         return orderRepository.findAll();
     }
 
-    public Order getOrder(Long id) {
+    public Mono<Order> getOrder(Long id) {
         return orderRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + id));
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Order not found: " + id)));
+    }
+
+    public Flux<OrderItem> getOrderItems(Long orderId) {
+        return orderItemRepository.findByOrderId(orderId);
+    }
+
+    private Mono<Void> saveOrderItems(Order order, java.util.List<CartItem> cartItems) {
+        return Flux.fromIterable(cartItems)
+                .map(cartItem -> {
+                    OrderItem orderItem = new OrderItem();
+                    orderItem.setOrderId(order.getId());
+                    orderItem.setItemId(cartItem.getItemId());
+                    orderItem.setTitle(cartItem.getTitle());
+                    orderItem.setPrice(cartItem.getPrice());
+                    orderItem.setCount(cartItem.getCount());
+                    return orderItem;
+                })
+                .collectList()
+                .flatMapMany(orderItemRepository::saveAll)
+                .then();
     }
 }
