@@ -75,14 +75,8 @@ public class CartService {
     }
 
     private Mono<User> validateUser(Long userId) {
-        return userRepository.existsById(userId)
-                .flatMap(exists -> {
-                    if (!exists) {
-                        return Mono.error(new IllegalStateException("User not found: " + userId));
-                    }
-                    return userRepository.findById(userId)
-                            .switchIfEmpty(Mono.error(new IllegalStateException("User not found: " + userId)));
-                });
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new IllegalStateException("User not found: " + userId)));
     }
 
     private void validateUserId(Long userId) {

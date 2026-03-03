@@ -4,7 +4,6 @@ import com.example.mymarketapp.dto.ItemDto;
 import com.example.mymarketapp.dto.PagingDto;
 import com.example.mymarketapp.entity.Item;
 import com.example.mymarketapp.repository.ItemRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,13 +23,11 @@ public class ItemService {
     private final ItemRepository itemRepository;
     private final CartService cartService;
 
-    @PostConstruct
-    public void initData() {
-        itemRepository.count()
+    public Mono<Void> initData() {
+        return itemRepository.count()
                 .filter(count -> count == 0)
                 .flatMapMany(ignore -> itemRepository.saveAll(initialItems()))
-                .then()
-                .subscribe();
+                .then();
     }
 
     private List<Item> initialItems() {

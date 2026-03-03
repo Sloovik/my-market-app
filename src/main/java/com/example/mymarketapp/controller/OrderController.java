@@ -53,7 +53,7 @@ public class OrderController {
                 });
     }
 
-    @PostMapping("/orders/buy")
+    @PostMapping("/buy")
     public Mono<String> buy(WebSession session) {
         Long userId = getCurrentUserId(session);
         return orderService.createOrder(userId)
