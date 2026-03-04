@@ -1,10 +1,10 @@
 package com.example.mymarketapp.repository;
 
 import com.example.mymarketapp.entity.Cart;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
-import java.util.Optional;
+public interface CartRepository extends ReactiveCrudRepository<Cart, Long> {
 
-public interface CartRepository extends JpaRepository<Cart, Long> {
-    Optional<Cart> findByUserId(Long userId);
+    Mono<Cart> findByUserId(Long userId);
 }

@@ -1,30 +1,23 @@
 package com.example.mymarketapp.entity;
 
-import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "order_items")
-@Getter
-@Setter
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@ToString
+@Data
+@Table("order_items")
 public class OrderItem {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
-    @ToString.Exclude
-    private Order order;
+    @Column("order_id")
+    private Long orderId;
 
-    @Column(name = "item_id")
+    @Column("item_id")
     private long itemId;
+
     private String title;
     private long price;
     private int count;

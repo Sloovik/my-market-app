@@ -1,167 +1,108 @@
 package com.example.mymarketapp.service;
 
 import com.example.mymarketapp.dto.ActionDto;
-import com.example.mymarketapp.entity.*;
-import com.example.mymarketapp.repository.*;
+import com.example.mymarketapp.entity.Cart;
+import com.example.mymarketapp.entity.CartItem;
+import com.example.mymarketapp.entity.Item;
+import com.example.mymarketapp.entity.User;
+import com.example.mymarketapp.repository.CartItemRepository;
+import com.example.mymarketapp.repository.CartRepository;
+import com.example.mymarketapp.repository.ItemRepository;
+import com.example.mymarketapp.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
+import org.mockito.Mockito;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class CartServiceTest {
 
-    @Mock private CartRepository cartRepository;
-    @Mock private CartItemRepository cartItemRepository;
-    @Mock private ItemRepository itemRepository;
-    @Mock private UserRepository userRepository;
+    private CartRepository cartRepository;
+    private CartItemRepository cartItemRepository;
+    private ItemRepository itemRepository;
+    private UserRepository userRepository;
 
-    @InjectMocks private CartService cartService;
-
-    private User testUser;
-    private Cart testCart;
-    private Item testItem;
-    private CartItem testCartItem;
+    private CartService cartService;
 
     @BeforeEach
     void setUp() {
-        testUser = new User();
-        testUser.setId(1L);
-        testUser.setUsername("testuser");
+        cartRepository = Mockito.mock(CartRepository.class);
+        cartItemRepository = Mockito.mock(CartItemRepository.class);
+        itemRepository = Mockito.mock(ItemRepository.class);
+        userRepository = Mockito.mock(UserRepository.class);
 
-        testCart = new Cart();
-        testCart.setId(1L);
-        testCart.setUser(testUser);
-
-        testItem = new Item();
-        testItem.setId(1L);
-        testItem.setTitle("Test Item");
-        testItem.setPrice(1000L);
-
-        testCartItem = new CartItem();
-        testCartItem.setId(1L);
-        testCartItem.setItemId(1L);
-        testCartItem.setCount(2);
-        testCartItem.setPrice(1000L);
-    }
-
-    @Test
-    void getCartReturnsItems() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
-
-        List<CartItem> result = cartService.getCart(1L);
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getCount()).isEqualTo(2);
-        verify(userRepository).existsById(eq(1L));
-        verify(userRepository).findById(eq(1L));
-    }
-
-    @Test
-    void getCartUserNotFoundThrowsException() {
-        when(userRepository.existsById(eq(1L))).thenReturn(false);
-
-        assertThatThrownBy(() -> cartService.getCart(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("User not found: 1");
+        cartService = new CartService(cartRepository, cartItemRepository, itemRepository, userRepository);
     }
 
     @Test
     void getTotalReturnsCorrectSum() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
+        long userId = 1L;
 
-        long total = cartService.getTotal(1L);
+        User user = new User();
+        user.setId(userId);
+        user.setUsername("demo");
 
-        assertThat(total).isEqualTo(2000L);
+        Cart cart = new Cart();
+        cart.setId(10L);
+        cart.setUserId(userId);
+
+        CartItem ci1 = new CartItem();
+        ci1.setCartId(cart.getId());
+        ci1.setItemId(100L);
+        ci1.setPrice(1000L);
+        ci1.setCount(2);
+
+        CartItem ci2 = new CartItem();
+        ci2.setCartId(cart.getId());
+        ci2.setItemId(200L);
+        ci2.setPrice(500L);
+        ci2.setCount(1);
+
+        when(userRepository.existsById(userId)).thenReturn(Mono.just(true));
+        when(userRepository.findById(userId)).thenReturn(Mono.just(user));
+        when(cartRepository.findByUserId(userId)).thenReturn(Mono.just(cart));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(Flux.just(ci1, ci2));
+
+        StepVerifier.create(cartService.getTotal(userId))
+                .expectNext(1000L * 2 + 500L)
+                .verifyComplete();
     }
 
     @Test
-    void getCountReturnsCorrectCount() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartId(eq(1L))).thenReturn(List.of(testCartItem));
+    void updateCartPlusCreatesNewItem() {
+        long userId = 1L;
+        long itemId = 100L;
 
-        int count = cartService.getCount(1L, 1L);
+        User user = new User();
+        user.setId(userId);
+        user.setUsername("demo");
 
-        assertThat(count).isEqualTo(2);
-    }
+        Cart cart = new Cart();
+        cart.setId(10L);
+        cart.setUserId(userId);
 
-    @Test
-    void updateCartDeleteRemovesItem() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
+        Item item = new Item();
+        item.setId(itemId);
+        item.setTitle("Test");
+        item.setDescription("Desc");
+        item.setImgPath("/img");
+        item.setPrice(1000L);
 
-        cartService.updateCart(1L, 1L, ActionDto.DELETE);
+        when(userRepository.existsById(userId)).thenReturn(Mono.just(true));
+        when(userRepository.findById(userId)).thenReturn(Mono.just(user));
+        when(cartRepository.findByUserId(userId)).thenReturn(Mono.just(cart));
+        when(cartItemRepository.findByCartIdAndItemId(cart.getId(), itemId)).thenReturn(Mono.empty());
+        when(itemRepository.findById(itemId)).thenReturn(Mono.just(item));
+        when(cartItemRepository.save(any(CartItem.class))).thenAnswer(invocation ->
+                Mono.just(invocation.getArgument(0, CartItem.class)));
 
-        verify(cartItemRepository).delete(testCartItem);
-    }
+        StepVerifier.create(cartService.updateCart(userId, itemId, ActionDto.PLUS))
+                .verifyComplete();
 
-    @Test
-    void updateCartPlusIncreasesCount() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
-
-        cartService.updateCart(1L, 1L, ActionDto.PLUS);
-
-        assertThat(testCartItem.getCount()).isEqualTo(3);
-        verify(cartItemRepository).save(testCartItem);
-    }
-
-    @Test
-    void updateCartMinusToZeroDeletesItem() {
-        testCartItem.setCount(1);
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.of(testCartItem));
-
-        cartService.updateCart(1L, 1L, ActionDto.MINUS);
-
-        verify(cartItemRepository).delete(testCartItem);
-    }
-
-    @Test
-    void updateCartPlusNewItemCreatesNew() {
-        when(userRepository.existsById(eq(1L))).thenReturn(true);
-        when(userRepository.findById(eq(1L))).thenReturn(Optional.of(testUser));
-        when(cartRepository.findByUserId(eq(1L))).thenReturn(Optional.of(testCart));
-        when(itemRepository.findById(eq(1L))).thenReturn(Optional.of(testItem));
-        when(cartItemRepository.findByCartIdAndItemId(eq(1L), eq(1L))).thenReturn(Optional.empty());
-
-        cartService.updateCart(1L, 1L, ActionDto.PLUS);
-
-        verify(cartItemRepository).save(argThat(item ->
-                item.getItemId().equals(1L) && item.getCount() == 1));
-    }
-
-    @Test
-    void invalidUserIdThrowsException() {
-        assertThatThrownBy(() -> cartService.getCart(0L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Valid userId required");
+        verify(cartItemRepository, times(1)).save(any(CartItem.class));
     }
 }

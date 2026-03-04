@@ -1,29 +1,21 @@
 package com.example.mymarketapp.entity;
 
-import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "cart_items")
-@Getter
-@Setter
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@ToString
+@Data
+@Table("cart_items")
 public class CartItem {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cart_id", nullable = false)
-    @ToString.Exclude
-    private Cart cart;
+    @Column("cart_id")
+    private Long cartId;
 
-    @Column(name = "item_id", nullable = false)
+    @Column("item_id")
     private Long itemId;
 
     private String title;
