@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: market_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  market-app:
+    build: ./market-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/market_db
+      SPRING_R2DBC_USERNAME: postgres
+      SPRING_R2DBC_PASSWORD: password
+      SPRING_DATA_REDIS_HOST: redis
+      PAYMENT_SERVICE_URL: http://payment-service:8081
+
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "8081:8081"

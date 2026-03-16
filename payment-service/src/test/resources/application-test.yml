@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: payment-service-test
+
+server:
+  port: 0
+
+payment:
+  initial:
+    balance: 100000
+
+logging:
+  level:
+    com.example.paymentservice: DEBUG
