@@ -37,52 +37,44 @@ public class OrderService {
 
                     return cartService.getTotal(userId)
                             .flatMap(totalSum -> {
-                                return paymentService.hasEnoughBalance(totalSum)
-                                        .flatMap(hasBalance -> {
-                                            if (!hasBalance) {
-                                                return Mono.error(new IllegalStateException(
-                                                        "Недостаточно средств на счёте"));
-                                            }
+                                Order order = new Order();
+                                order.setUserId(userId);
+                                order.setTotalSum(totalSum);
 
-                                            Order order = new Order();
-                                            order.setUserId(userId);
-                                            order.setTotalSum(totalSum);
+                                return orderRepository.save(order)
+                                        .flatMap(savedOrder ->
+                                                paymentService.makePayment(
+                                                                savedOrder.getId(),
+                                                                totalSum
+                                                        )
+                                                        .flatMap(paymentResponse -> {
+                                                            if (!paymentResponse.getSuccess()) {
+                                                                String message = paymentResponse.getMessage() != null
+                                                                        ? paymentResponse.getMessage()
+                                                                        : "Ошибка оплаты";
 
-                                            return orderRepository.save(order)
-                                                    .flatMap(savedOrder ->
-                                                            paymentService.makePayment(
-                                                                            savedOrder.getId(),
-                                                                            totalSum
-                                                                    )
-                                                                    .flatMap(paymentResponse -> {
-                                                                        if (!paymentResponse.getSuccess()) {
-                                                                            return orderRepository
-                                                                                    .delete(savedOrder)
-                                                                                    .then(Mono.error(
-                                                                                            new IllegalStateException(
-                                                                                                    "Ошибка оплаты: " +
-                                                                                                            paymentResponse.getMessage()
-                                                                                            )
-                                                                                    ));
-                                                                        }
+                                                                return orderRepository
+                                                                        .delete(savedOrder)
+                                                                        .then(Mono.error(
+                                                                                new IllegalStateException(message)
+                                                                        ));
+                                                            }
 
-                                                                        log.info("Payment successful for order {}, " +
-                                                                                        "remaining balance: {}",
-                                                                                savedOrder.getId(),
-                                                                                paymentResponse.getRemainingBalance());
+                                                            log.info("Payment successful for order {}, remaining balance: {}",
+                                                                    savedOrder.getId(),
+                                                                    paymentResponse.getRemainingBalance());
 
-                                                                        return saveOrderItems(savedOrder, cartItems)
-                                                                                .then(cartService.clearCart(userId))
-                                                                                .thenReturn(savedOrder);
-                                                                    })
-                                                                    .onErrorResume(e -> {
-                                                                        log.error("Payment error, rolling back order {}",
-                                                                                savedOrder.getId(), e);
-                                                                        return orderRepository.delete(savedOrder)
-                                                                                .then(Mono.error(e));
-                                                                    })
-                                                    );
-                                        });
+                                                            return saveOrderItems(savedOrder, cartItems)
+                                                                    .then(cartService.clearCart(userId))
+                                                                    .thenReturn(savedOrder);
+                                                        })
+                                                        .onErrorResume(e -> {
+                                                            log.error("Payment error, rolling back order {}",
+                                                                    savedOrder.getId(), e);
+                                                            return orderRepository.delete(savedOrder)
+                                                                    .then(Mono.error(e));
+                                                        })
+                                        );
                             });
                 });
     }

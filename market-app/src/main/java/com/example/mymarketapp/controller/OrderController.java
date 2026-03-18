@@ -61,27 +61,18 @@ public class OrderController {
     public Mono<String> buy(WebSession session, Model model) {
         Long userId = getCurrentUserId(session);
 
-        return cartService.getTotal(userId)
-                .flatMap(totalSum ->
-                        paymentService.hasEnoughBalance(totalSum)
-                                .flatMap(hasBalance -> {
-                                    if (!hasBalance) {
-                                        model.addAttribute("error",
-                                                "Недостаточно средств на счёте или сервис платежей недоступен");
-                                        return Mono.just("redirect:/cart?error=insufficient_funds");
-                                    }
-
-                                    return orderService.createOrder(userId)
-                                            .map(order -> "redirect:/orders/" + order.getId() + "?newOrder=true")
-                                            .onErrorResume(e -> {
-                                                model.addAttribute("error", e.getMessage());
-                                                return Mono.just("redirect:/cart?error=payment_failed");
-                                            });
-                                })
-                )
+        return orderService.createOrder(userId)
+                .map(order -> "redirect:/orders/" + order.getId() + "?newOrder=true")
                 .onErrorResume(e -> {
-                    model.addAttribute("error", "Ошибка при оформлении заказа: " + e.getMessage());
-                    return Mono.just("redirect:/cart?error=true");
+                    String message = e.getMessage() != null ? e.getMessage() : "Ошибка при оплате заказа";
+
+                    model.addAttribute("error", message);
+
+                    if (message.contains("Недостаточно средств")) {
+                        return Mono.just("redirect:/cart?error=insufficient_funds");
+                    }
+
+                    return Mono.just("redirect:/cart?error=payment_failed");
                 });
     }
 
