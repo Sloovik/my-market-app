@@ -1,0 +1,159 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: REST API для сервиса платежей интернет-магазина
+  version: 1.0.0
+  contact:
+    name: Market App Team
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+  - url: http://payment-service:8081
+    description: Docker environment
+
+tags:
+  - name: payment
+    description: Операции с платежами
+
+paths:
+  /api/balance:
+    get:
+      tags:
+        - payment
+      summary: Получить текущий баланс
+      description: Возвращает доступный баланс на счёте пользователя
+      operationId: getBalance
+      responses:
+        '200':
+          description: Успешное получение баланса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payment:
+    post:
+      tags:
+        - payment
+      summary: Осуществить платеж
+      description: Списывает указанную сумму с баланса пользователя
+      operationId: makePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платеж успешно выполнен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Недостаточно средств или некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    BalanceResponse:
+      type: object
+      required:
+        - balance
+      properties:
+        balance:
+          type: integer
+          format: int64
+          description: Доступный баланс в копейках
+          example: 100000
+          minimum: 0
+        currency:
+          type: string
+          description: Валюта
+          example: RUB
+          default: RUB
+
+    PaymentRequest:
+      type: object
+      required:
+        - amount
+        - orderId
+      properties:
+        amount:
+          type: integer
+          format: int64
+          description: Сумма платежа в копейках
+          example: 15000
+          minimum: 1
+        orderId:
+          type: integer
+          format: int64
+          description: Идентификатор заказа
+          example: 123
+        description:
+          type: string
+          description: Описание платежа
+          example: Оплата заказа №123
+          maxLength: 500
+
+    PaymentResponse:
+      type: object
+      required:
+        - success
+        - remainingBalance
+      properties:
+        success:
+          type: boolean
+          description: Статус выполнения платежа
+          example: true
+        remainingBalance:
+          type: integer
+          format: int64
+          description: Остаток на балансе после платежа в копейках
+          example: 85000
+          minimum: 0
+        transactionId:
+          type: string
+          description: Идентификатор транзакции
+          example: txn_1234567890
+        message:
+          type: string
+          description: Дополнительное сообщение
+          example: Платеж успешно выполнен
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Код ошибки
+          example: INSUFFICIENT_FUNDS
+        message:
+          type: string
+          description: Описание ошибки
+          example: Недостаточно средств на счёте
+        timestamp:
+          type: string
+          format: date-time
+          description: Время возникновения ошибки

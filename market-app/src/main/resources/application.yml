@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: market-app
+
+  r2dbc:
+    url: r2dbc:h2:mem:///testdb;DB_CLOSE_DELAY=-1;MODE=LEGACY
+    username: sa
+    password:
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      connect-timeout: 2000ms
+
+  sql:
+    init:
+      mode: always
+
+  h2:
+    console:
+      enabled: true
+
+  thymeleaf:
+    cache: false
+
+server:
+  port: 8080
+
+payment:
+  service:
+    url: http://localhost:8081
+
+logging:
+  level:
+    com.example.mymarketapp: DEBUG
+    org.springframework.data.redis: DEBUG

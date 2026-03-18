@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: payment-service
+
+server:
+  port: 8081
+
+payment:
+  initial:
+    balance: 200000
+
+logging:
+  level:
+    com.example.paymentservice: DEBUG
+    org.springframework.web: DEBUG
