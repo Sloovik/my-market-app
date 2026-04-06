@@ -2,20 +2,24 @@ package com.example.mymarketapp.integration;
 
 import com.example.mymarketapp.cache.CachedItem;
 import com.example.mymarketapp.cache.ItemCacheRepository;
+import com.example.mymarketapp.client.api.PaymentApi;
 import com.example.mymarketapp.entity.Item;
 import com.example.mymarketapp.repository.ItemRepository;
+import com.example.mymarketapp.repository.UserRepository;
 import com.example.mymarketapp.service.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import reactor.test.StepVerifier;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.util.List;
 
@@ -26,6 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 class RedisIntegrationTest {
 
+    @MockBean
+    private PaymentApi paymentApi;
+
     @Container
     static GenericContainer<?> redis =
             new GenericContainer<>("redis:7-alpine")
@@ -33,8 +40,8 @@ class RedisIntegrationTest {
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.redis.host", redis::getHost);
-        registry.add("spring.redis.port", () -> redis.getMappedPort(6379));
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
     }
 
     @Autowired
@@ -46,9 +53,23 @@ class RedisIntegrationTest {
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @BeforeEach
     void setUp() {
         itemCacheRepository.clearCache().block();
+        userRepository.findById(1L)
+                .switchIfEmpty(Mono.defer(() -> {
+                    com.example.mymarketapp.entity.User u = new com.example.mymarketapp.entity.User();
+                    u.setId(1L);
+                    u.setUsername("testuser");
+                    u.setPassword("pass");
+                    u.setRole("ROLE_USER");
+                    u.setEnabled(true);
+                    return userRepository.save(u);
+                }))
+                .block();
     }
 
     @Test

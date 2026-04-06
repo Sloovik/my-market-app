@@ -1,19 +1,74 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head><title th:text="${item.title}">Товар</title>
-    <meta charset="UTF-8"></head>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${item.title}">Товар</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .item-details { display: flex; gap: 30px; margin: 20px 0; }
+        .item-image img { width: 400px; max-width: 100%; border-radius: 8px; }
+        .item-info h1 { margin-top: 0; }
+        .cart-actions { margin: 20px 0; }
+        button { padding: 8px 16px; cursor: pointer; margin-right: 5px; }
+        .anonymous-message { color: #999; font-style: italic; margin: 10px 0; }
+    </style>
+</head>
 <body>
-<h1 th:text="${item.title}">Название</h1>
-<img th:src="${item.imgPath}" alt="Изображение" style="width:300px;"/>
-<p th:text="${item.description}">Описание</p>
-<p><strong>Цена: </strong><span th:text="${#numbers.formatInteger(item.price, 3, 'COMMA')}">0</span> ₽</p>
-<p>В корзине: <span th:text="${item.count}">0</span></p>
-<form th:action="@{/items/{id}(id=${item.id})}" method="post">
-    <button type="submit" name="action" value="PLUS">+</button>
-    <button type="submit" name="action" value="MINUS">-</button>
-</form>
-<p><a th:href="@{/items}">← Назад к товарам</a> |
-    <a th:href="@{/cart}">Корзина (<span th:text="${totalCart}">0</span>)</a> |
-    <a th:href="@{/orders}">Заказы</a></p>
+
+<div class="header">
+    <div>
+        <a th:href="@{/items}">← Назад к товарам</a>
+    </div>
+
+    <div sec:authorize="isAuthenticated()">
+        <span>Привет, <strong sec:authentication="name"></strong></span>
+        <form method="post" th:action="@{/logout}" style="display: inline; margin-left: 10px;">
+            <button type="submit">Выход</button>
+        </form>
+    </div>
+
+    <div sec:authorize="!isAuthenticated()">
+        <a href="/login">Вход</a>
+    </div>
+</div>
+
+<div class="item-details">
+    <div class="item-image">
+        <img th:src="${item.imgPath}" alt="Изображение товара"/>
+    </div>
+
+    <div class="item-info">
+        <h1 th:text="${item.title}">Название</h1>
+        <p th:text="${item.description}">Описание</p>
+        <p style="font-size: 24px; font-weight: bold;">
+            Цена: <span th:text="${#numbers.formatInteger(item.price, 3, 'COMMA')}">0</span> ₽
+        </p>
+
+        <div sec:authorize="isAuthenticated()" class="cart-actions">
+            <p>В корзине: <strong th:text="${item.count}">0</strong></p>
+            <form th:action="@{/items/{id}(id=${item.id})}" method="post">
+                <button type="submit" name="action" value="PLUS">+ Добавить</button>
+                <button type="submit" name="action" value="MINUS" th:disabled="${item.count == 0}">- Убрать</button>
+            </form>
+        </div>
+
+        <div sec:authorize="!isAuthenticated()" class="anonymous-message">
+            <p>Войдите в аккаунт, чтобы добавить товар в корзину</p>
+            <a href="/login">Войти</a>
+        </div>
+    </div>
+</div>
+
+<p style="margin-top: 30px;">
+    <a th:href="@{/items}">← Назад к товарам</a>
+
+    <span sec:authorize="isAuthenticated()">
+        | <a th:href="@{/cart}">Корзина (<span th:text="${totalCart}">0</span> ₽)</a>
+        | <a th:href="@{/orders}">Мои заказы</a>
+    </span>
+</p>
+
 </body>
 </html>

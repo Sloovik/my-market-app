@@ -25,6 +25,19 @@ spring:
   thymeleaf:
     cache: false
 
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: market-app-client
+            client-secret: sVnUrlE1Zt7KMdifhiYaskKFDCRUIXPj
+            authorization-grant-type: client_credentials
+            scope: openid
+        provider:
+          keycloak:
+            token-uri: http://localhost:8180/realms/market-realm/protocol/openid-connect/token
+
 server:
   port: 8080
 

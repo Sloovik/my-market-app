@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -28,6 +29,7 @@ class PaymentIntegrationTest {
     private PaymentApi paymentApi;
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldGetBalance() {
         BalanceResponse mockResponse = new BalanceResponse();
         mockResponse.setBalance(100000L);
@@ -41,6 +43,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldReturnEmptyWhenPaymentServiceUnavailable() {
         when(paymentApi.getBalance()).thenReturn(Mono.error(new RuntimeException("Service down")));
 
@@ -49,6 +52,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldMakeSuccessfulPayment() {
         PaymentResponse mockResponse = new PaymentResponse();
         mockResponse.setSuccess(true);
@@ -69,6 +73,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldHandleInsufficientFunds() {
         PaymentResponse mockResponse = new PaymentResponse();
         mockResponse.setSuccess(false);
@@ -87,6 +92,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldCheckEnoughBalance_True() {
         // Given
         BalanceResponse mockResponse = new BalanceResponse();
@@ -100,6 +106,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldCheckEnoughBalance_False() {
         BalanceResponse mockResponse = new BalanceResponse();
         mockResponse.setBalance(30000L);
@@ -112,6 +119,7 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "testuser", roles = "USER")
     void shouldReturnFalse_WhenPaymentServiceUnavailable() {
         when(paymentApi.getBalance()).thenReturn(Mono.error(new RuntimeException("Unavailable")));
 

@@ -69,8 +69,6 @@ public class ItemService {
                                                    int pageNumber,
                                                    int pageSize,
                                                    Long userId) {
-        validateUserId(userId);
-
         Sort sortObj = getSort(sort);
         Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, sortObj);
 
@@ -157,8 +155,6 @@ public class ItemService {
     }
 
     public Mono<ItemDto> getItemDto(Long id, Long userId) {
-        validateUserId(userId);
-
         return itemCacheRepository.getItem(id)
                 .flatMap(cached -> {
                     log.info("Item {} loaded from cache", id);

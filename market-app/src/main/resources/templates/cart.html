@@ -1,32 +1,51 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <title>Корзина</title>
     <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .error { color: red; font-weight: bold; margin: 10px 0; }
         .warning { color: orange; font-weight: bold; margin: 10px 0; }
         .success { color: green; }
         button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
+        th { background-color: #f5f5f5; }
     </style>
 </head>
 <body>
-<h1>Корзина</h1>
+
+<div class="header">
+    <h1>Корзина</h1>
+
+    <div sec:authorize="isAuthenticated()">
+        <span>Привет, <strong sec:authentication="name"></strong></span>
+        <form method="post" th:action="@{/logout}" style="display: inline; margin-left: 10px;">
+            <button type="submit">Выход</button>
+        </form>
+    </div>
+</div>
 
 <div th:if="${errorMessage}" class="error" th:text="${errorMessage}"></div>
 <div th:if="${paymentMessage}" class="warning" th:text="${paymentMessage}"></div>
 
-<table border="1">
+<table>
+    <thead>
     <tr>
         <th>Товар</th>
         <th>Цена</th>
         <th>Кол-во</th>
         <th>Действия</th>
     </tr>
+    </thead>
+    <tbody>
     <tr th:each="item : ${items}">
         <td>
-            <img th:src="${item.imgPath}" style="width:100px;"/>
-            <span th:text="${item.title}"></span>
+            <img th:src="${item.imgPath}" style="width:100px; height: 75px; object-fit: cover;"/>
+            <span th:text="${item.title}" style="margin-left: 10px;"></span>
         </td>
         <td th:text="${#numbers.formatInteger(item.price, 3, 'COMMA')} + ' ₽'">0 ₽</td>
         <td th:text="${item.count}">0</td>
@@ -39,6 +58,13 @@
             </form>
         </td>
     </tr>
+
+    <tr th:if="${#lists.isEmpty(items)}">
+        <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+            Корзина пуста. <a th:href="@{/items}">Перейти к товарам</a>
+        </td>
+    </tr>
+    </tbody>
 </table>
 
 <h2>Итого: <span th:text="${#numbers.formatInteger(total, 0, 'COMMA')}">0</span> ₽</h2>
@@ -47,10 +73,18 @@
     <p>Баланс: <span class="success" th:text="${#numbers.formatInteger(balance, 0, 'COMMA')} + ' ₽'">0 ₽</span></p>
 </div>
 
-<form th:action="@{/orders/buy}" method="post">
-    <button type="submit" th:disabled="${!canCheckout}">Оформить заказ</button>
+<form th:action="@{/orders/buy}" method="post" style="margin: 20px 0;">
+    <button type="submit" th:disabled="${!canCheckout}" style="padding: 10px 20px; font-size: 16px;">
+        Оформить заказ
+    </button>
+    <span th:if="${!canCheckout}" style="color: #999; margin-left: 10px;">
+        (недоступно - проверьте баланс)
+    </span>
 </form>
 
-<p><a th:href="@{/items}">← Товары</a> | <a th:href="@{/orders}">Заказы</a></p>
+<p>
+    <a th:href="@{/items}">← Товары</a> |
+    <a th:href="@{/orders}">Мои заказы</a>
+</p>
+
 </body>
-</html>

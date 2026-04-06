@@ -7,10 +7,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = PaymentServiceApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -20,13 +28,24 @@ import static org.assertj.core.api.Assertions.assertThat;
         })
 @AutoConfigureWebTestClient
 class PaymentControllerTest {
+    @TestConfiguration
+    static class TestSecurityConfig {
+        @Bean
+        public ReactiveJwtDecoder reactiveJwtDecoder() {
+            ReactiveJwtDecoder decoder = mock(ReactiveJwtDecoder.class);
+            when(decoder.decode(anyString())).thenReturn(Mono.empty());
+            return decoder;
+        }
+    }
 
     @Autowired
     private WebTestClient webTestClient;
 
     @Test
     void shouldGetBalance() {
-        webTestClient.get()
+        webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockJwt())
+                .get()
                 .uri("/api/balance")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
@@ -45,7 +64,9 @@ class PaymentControllerTest {
         request.setAmount(10000L);
         request.setDescription("Test payment");
 
-        webTestClient.post()
+        webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockJwt())
+                .post()
                 .uri("/api/payment")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -64,7 +85,9 @@ class PaymentControllerTest {
         PaymentRequest request = new PaymentRequest();
         request.setAmount(10000L);
 
-        webTestClient.post()
+        webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockJwt())
+                .post()
                 .uri("/api/payment")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -79,7 +102,9 @@ class PaymentControllerTest {
         request.setAmount(999999999L);
         request.setDescription("Too much");
 
-        webTestClient.post()
+        webTestClient
+                .mutateWith(SecurityMockServerConfigurers.mockJwt())
+                .post()
                 .uri("/api/payment")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
