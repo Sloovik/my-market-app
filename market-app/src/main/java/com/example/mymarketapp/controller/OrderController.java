@@ -2,14 +2,17 @@ package com.example.mymarketapp.controller;
 
 import com.example.mymarketapp.entity.Order;
 import com.example.mymarketapp.model.OrderItemDto;
-import com.example.mymarketapp.service.CartService;
+import com.example.mymarketapp.repository.UserRepository;
 import com.example.mymarketapp.service.OrderService;
-import com.example.mymarketapp.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -21,21 +24,27 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
-    private final PaymentService paymentService;
-    private final CartService cartService;
+    private final UserRepository userRepository;
 
-    private Long getCurrentUserId(WebSession session) {
-        Long userId = session.getAttribute("userId");
-        if (userId == null) {
-            userId = 1L;
-            session.getAttributes().put("userId", userId);
-        }
-        return userId;
+    private Mono<Long> getCurrentUserId() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .filter(auth -> auth != null && auth.isAuthenticated())
+                .map(Authentication::getPrincipal)
+                .ofType(UserDetails.class)
+                .flatMap(userDetails ->
+                        userRepository.findByUsername(userDetails.getUsername())
+                                .map(user -> user.getId())
+                )
+                .switchIfEmpty(Mono.error(
+                        new SecurityException("User not authenticated")
+                ));
     }
 
     @GetMapping
     public Mono<String> orders(Model model) {
-        return orderService.getAllOrders()
+        return getCurrentUserId()
+                .flatMapMany(userId -> orderService.getAllOrdersForUser(userId))
                 .flatMap(this::mapToOrderDto)
                 .collectList()
                 .map(orders -> {
@@ -48,7 +57,15 @@ public class OrderController {
     public Mono<String> order(@PathVariable Long id,
                               @RequestParam(defaultValue = "false") boolean newOrder,
                               Model model) {
-        return orderService.getOrder(id)
+        return getCurrentUserId()
+                .flatMap(userId -> orderService.getOrder(id)
+                        .flatMap(order -> {
+                            if (!order.getUserId().equals(userId)) {
+                                return Mono.error(new AccessDeniedException("Access denied"));
+                            }
+                            return Mono.just(order);
+                        })
+                )
                 .flatMap(this::mapToOrderDto)
                 .map(orderDto -> {
                     model.addAttribute("order", orderDto);
@@ -58,13 +75,14 @@ public class OrderController {
     }
 
     @PostMapping("/buy")
-    public Mono<String> buy(WebSession session, Model model) {
-        Long userId = getCurrentUserId(session);
-
-        return orderService.createOrder(userId)
+    public Mono<String> buy(Model model) {
+        return getCurrentUserId()
+                .flatMap(userId -> orderService.createOrder(userId))
                 .map(order -> "redirect:/orders/" + order.getId() + "?newOrder=true")
                 .onErrorResume(e -> {
-                    String message = e.getMessage() != null ? e.getMessage() : "Ошибка при оплате заказа";
+                    String message = e.getMessage() != null
+                            ? e.getMessage()
+                            : "Ошибка при оплате заказа";
 
                     model.addAttribute("error", message);
 

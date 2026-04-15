@@ -1,35 +1,47 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16-alpine
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: keycloak
+    command:
+      - start-dev
     environment:
-      POSTGRES_DB: market_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8180
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
     ports:
-      - "5432:5432"
+      - "8180:8180"
+    networks:
+      - market-network
 
   redis:
     image: redis:7-alpine
+    container_name: market-redis
     ports:
       - "6379:6379"
+    networks:
+      - market-network
 
-  market-app:
-    build: ./market-app
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-      - redis
+  postgres:
+    image: postgres:15-alpine
+    container_name: market-postgres
     environment:
-      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/market_db
-      SPRING_R2DBC_USERNAME: postgres
-      SPRING_R2DBC_PASSWORD: password
-      SPRING_DATA_REDIS_HOST: redis
-      PAYMENT_SERVICE_URL: http://payment-service:8081
-
-  payment-service:
-    build: ./payment-service
+      POSTGRES_DB: market_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "8081:8081"
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - market-network
+
+networks:
+  market-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

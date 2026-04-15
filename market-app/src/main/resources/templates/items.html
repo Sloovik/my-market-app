@@ -1,39 +1,111 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head><title>Товары</title></head>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Товары</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .auth-section { display: flex; gap: 10px; align-items: center; }
+        .search-form { margin-bottom: 20px; }
+        .item-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .item-card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+        .item-card img { width: 100%; height: 150px; object-fit: cover; }
+        .pagination { margin-top: 20px; }
+        .cart-link { position: fixed; top: 20px; right: 20px; background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; }
+        button { cursor: pointer; padding: 5px 10px; margin: 2px; }
+    </style>
+</head>
 <body>
-<form th:action="@{/items}" method="get">
-    <input type="text" th:name="search" th:value="${search}" placeholder="Поиск"/>
+
+<div class="header">
+    <h1>Витрина товаров</h1>
+
+    <div class="auth-section">
+        <div sec:authorize="isAuthenticated()">
+            <span>Привет, <strong sec:authentication="name"></strong></span>
+            <form method="post" th:action="@{/logout}" style="display: inline;">
+                <button type="submit">Выход</button>
+            </form>
+        </div>
+
+        <div sec:authorize="!isAuthenticated()">
+            <a href="/login">Вход</a>
+        </div>
+    </div>
+</div>
+
+<form th:action="@{/items}" method="get" class="search-form">
+    <input type="text" th:name="search" th:value="${search}" placeholder="Поиск по названию или описанию"/>
     <select th:name="sort">
         <option value="NO">Без сортировки</option>
         <option th:value="ALPHA" th:selected="${sort == 'ALPHA'}">По названию</option>
         <option th:value="PRICE" th:selected="${sort == 'PRICE'}">По цене</option>
     </select>
-    <button>Применить</button>
+    <select th:name="pageSize">
+        <option th:value="5" th:selected="${paging.pageSize == 5}">5 товаров</option>
+        <option th:value="10" th:selected="${paging.pageSize == 10}">10 товаров</option>
+        <option th:value="20" th:selected="${paging.pageSize == 20}">20 товаров</option>
+    </select>
+    <button type="submit">Применить</button>
 </form>
-<div th:each="row : ${items}">
-    <div th:each="item : ${row}" th:if="${item.id != -1}">
-        <img th:src="${item.imgPath}"/>
-        <h3 th:text="${item.title}"></h3>
-        <p th:text="${item.description}"></p>
-        <p>Цена: <span th:text="${item.price}"></span></p>
-        <span th:text="${item.count}"></span>
-        <form th:action="@{/items}" method="post">
-            <input type="hidden" name="id" th:value="${item.id}"/>
-            <input type="hidden" name="search" th:value="${search}"/>
-            <input type="hidden" name="sort" th:value="${sort}"/>
-            <input type="hidden" name="pageNumber" th:value="${paging.pageNumber}"/>
-            <input type="hidden" name="pageSize" th:value="${paging.pageSize}"/>
-            <button name="action" value="PLUS">+</button>
-            <button name="action" value="MINUS">-</button>
-        </form>
+
+<div class="item-grid">
+    <div th:each="row : ${items}">
+        <div th:each="item : ${row}" th:if="${item.id != -1}">
+            <div class="item-card">
+                <a th:href="@{/items/{id}(id=${item.id})}">
+                    <img th:src="${item.imgPath}" alt="Изображение товара"/>
+                </a>
+                <h3>
+                    <a th:href="@{/items/{id}(id=${item.id})}" th:text="${item.title}"></a>
+                </h3>
+                <p th:text="${item.description}"></p>
+                <p><strong>Цена:</strong> <span th:text="${item.price}"></span> ₽</p>
+
+                <div sec:authorize="isAuthenticated()">
+                    <p>В корзине: <span th:text="${item.count}">0</span></p>
+                    <form th:action="@{/items}" method="post">
+                        <input type="hidden" name="id" th:value="${item.id}"/>
+                        <input type="hidden" name="search" th:value="${search}"/>
+                        <input type="hidden" name="sort" th:value="${sort}"/>
+                        <input type="hidden" name="pageNumber" th:value="${paging.pageNumber}"/>
+                        <input type="hidden" name="pageSize" th:value="${paging.pageSize}"/>
+                        <button name="action" value="PLUS">+</button>
+                        <button name="action" value="MINUS">-</button>
+                        <button name="action" value="DELETE">Удалить</button>
+                    </form>
+                </div>
+
+                <div sec:authorize="!isAuthenticated()">
+                    <p><em>Войдите, чтобы добавить в корзину</em></p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber - 1},pageSize=${paging.pageSize})}"
-   th:if="${paging != null and paging.hasPrevious}">Предыдущая</a>
-<a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber + 1},pageSize=${paging.pageSize})}"
-   th:if="${paging != null and paging.hasNext}">Следующая</a>
-<a th:href="@{/cart}">Корзина (<span th:text="${totalCart}">0</span>)</a>
-<a th:href="@{/orders}">Заказы</a>
+
+<div class="pagination">
+    <a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber - 1},pageSize=${paging.pageSize})}"
+       th:if="${paging != null and paging.hasPrevious}">
+        ← Предыдущая
+    </a>
+    <span th:if="${paging != null}">
+        Страница <span th:text="${paging.pageNumber}"></span>
+    </span>
+    <a th:href="@{/items(search=${search?:''},sort=${sort},pageNumber=${paging.pageNumber + 1},pageSize=${paging.pageSize})}"
+       th:if="${paging != null and paging.hasNext}">
+        Следующая →
+    </a>
+</div>
+
+<div sec:authorize="isAuthenticated()" style="margin-top: 30px;">
+    <a th:href="@{/cart}" class="cart-link">
+        🛒 Корзина (<span th:text="${totalCart}">0</span> ₽)
+    </a>
+    <a th:href="@{/orders}" style="margin-left: 10px;">Мои заказы</a>
+</div>
+
 </body>
 </html>

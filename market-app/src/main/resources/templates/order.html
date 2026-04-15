@@ -1,18 +1,61 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head><title th:text="'Заказ #' + ${order.id}">Заказ</title></head>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'Заказ #' + ${order.id}">Заказ</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .success-message { color: green; font-weight: bold; padding: 10px; background: #e8f5e9; border-radius: 4px; margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
+        th { background-color: #f5f5f5; }
+    </style>
+</head>
 <body>
-<h1>Заказ #<span th:text="${order.id}">0</span></h1>
-<div th:if="${newOrder}" style="color:green;">Заказ успешно оформлен!</div>
-<table border="1">
-    <tr><th>Товар</th><th>Цена</th><th>Кол-во</th></tr>
+
+<div class="header">
+    <h1>Заказ #<span th:text="${order.id}">0</span></h1>
+
+    <div sec:authorize="isAuthenticated()">
+        <span>Привет, <strong sec:authentication="name"></strong></span>
+        <form method="post" th:action="@{/logout}" style="display: inline; margin-left: 10px;">
+            <button type="submit">Выход</button>
+        </form>
+    </div>
+</div>
+
+<div th:if="${newOrder}" class="success-message">
+    ✓ Заказ успешно оформлен!
+</div>
+
+<table>
+    <thead>
+    <tr>
+        <th>Товар</th>
+        <th>Цена</th>
+        <th>Количество</th>
+        <th>Сумма</th>
+    </tr>
+    </thead>
+    <tbody>
     <tr th:each="item : ${order.items}">
         <td th:text="${item.title}">Название</td>
-        <td th:text="${item.price}">0 ₽</td>
+        <td th:text="${#numbers.formatInteger(item.price, 3, 'COMMA')} + ' ₽'">0 ₽</td>
         <td th:text="${item.count}">0</td>
+        <td th:text="${#numbers.formatInteger(item.price * item.count, 3, 'COMMA')} + ' ₽'">0 ₽</td>
     </tr>
+    </tbody>
 </table>
-<h2>Итого: <span th:text="${#numbers.formatInteger(order.totalSum, 'COMMA')}">0</span> ₽</h2>
-<p><a th:href="@{/orders}">← К заказам</a> | <a th:href="@{/items}">Товары</a></p>
+
+<h2>Итого: <span th:text="${#numbers.formatInteger(order.totalSum, 3, 'COMMA')}">0</span> ₽</h2>
+
+<p>
+    <a th:href="@{/orders}">← К списку заказов</a> |
+    <a th:href="@{/items}">Товары</a> |
+    <a th:href="@{/cart}">Корзина</a>
+</p>
+
 </body>
 </html>

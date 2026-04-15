@@ -79,10 +79,6 @@ public class OrderService {
                 });
     }
 
-    public Flux<Order> getAllOrders() {
-        return orderRepository.findAll();
-    }
-
     public Mono<Order> getOrder(Long id) {
         return orderRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Order not found: " + id)));
@@ -106,5 +102,9 @@ public class OrderService {
                 .collectList()
                 .flatMapMany(orderItemRepository::saveAll)
                 .then();
+    }
+
+    public Flux<Order> getAllOrdersForUser(Long userId) {
+        return orderRepository.findByUserId(userId);
     }
 }
